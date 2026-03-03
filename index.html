@@ -1,121 +1,26 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EURIX - Image Tracking AR</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
-    <style>
-        body { margin: 0; overflow: hidden; background: #222; color: #fff; font-family: sans-serif; text-align: center; }
-        #ar-button {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            padding: 15px 30px; background: #00ff00; border: none; font-weight: bold;
-            color: black; cursor: pointer; z-index: 10000; display: none; border-radius: 5px;
-        }
-        #status { position: absolute; top: 15px; width: 100%; z-index: 10; font-size: 18px; }
-        /* L'immagine nascosta che passiamo al motore AR per fargliela imparare */
-        #img-reference { display: none; }
-    </style>
-</head>
-<body>
-    <div id="status">Caricamento immagine di riferimento...</div>
-    <button id="ar-button">AVVIA SCANSIONE IMPIANTO</button>
+    <title>EURIX - Tracciamento Marker</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  </head>
+  <body style="margin: 0; overflow: hidden;">
     
-    <img id="img-reference" src="qr.jpg" crossorigin="anonymous">
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;">
+      
+      <a-marker preset="hiro">
+        
+        <a-plane position="0 0.5 0" rotation="-90 0 0" width="1.5" height="1" color="#121212" opacity="0.9">
+          <a-text value="IMPIANTO: UTA-01\n\nTemperatura: 22.4 C\nFlusso: Nominale\nStato: ATTIVO" 
+                  align="center" color="#00FF00" width="3" position="0 0 0.05">
+          </a-text>
+        </a-plane>
 
-    <script>
-        let scene, camera, renderer, virtualPanel;
-        const btn = document.getElementById('ar-button');
-        const statusText = document.getElementById('status');
-        const img = document.getElementById('img-reference');
+      </a-marker>
 
-        // 1. Aspettiamo che il browser legga l'immagine prima di attivare l'AR
-        img.onload = async () => {
-            statusText.innerHTML = "Immagine pronta. Attendi avvio AR...";
-            // Trasformiamo l'immagine in una "Bitmap" leggibile dai sensori
-            const imageBitmap = await createImageBitmap(img);
-            
-            btn.style.display = 'block';
-            statusText.innerHTML = "Pronto. Punta la scrivania.";
-            
-            btn.onclick = async () => {
-                if (!navigator.xr) return alert("WebXR non supportato");
-                
-                try {
-                    // Chiediamo l'accesso all'Image Tracking invece che all'Hit-Test
-                    const session = await navigator.xr.requestSession('immersive-ar', {
-                        requiredFeatures: ['image-tracking'],
-                        trackedImages: [{
-                            image: imageBitmap,
-                            widthInMeters: 0.15 // Diciamo al sistema che il QR stampato è largo 15 centimetri
-                        }]
-                    });
-                    
-                    btn.style.display = 'none';
-                    statusText.innerHTML = "Inquadra il QR Code...";
-                    init();
-                    renderer.xr.setSession(session);
-                } catch (error) {
-                    alert("Errore avvio AR: " + error.message);
-                }
-            };
-        };
-
-        function init() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-            scene.add(light);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            document.body.appendChild(renderer.domElement);
-
-            // 2. CREIAMO IL PANNELLO VIRTUALE (Per ora un rettangolo rosso scuro)
-            const geometry = new THREE.BoxGeometry(0.2, 0.05, 0.2); 
-            const material = new THREE.MeshPhongMaterial({ color: 0x8b0000 });
-            virtualPanel = new THREE.Mesh(geometry, material);
-            
-            virtualPanel.matrixAutoUpdate = false;
-            virtualPanel.visible = false; // Nascosto finché non trova il QR
-            scene.add(virtualPanel);
-
-            renderer.setAnimationLoop(render);
-        }
-
-        function render(timestamp, frame) {
-            if (frame) {
-                // Chiediamo al frame se ha visto il nostro QR code
-                const results = frame.getImageTrackingResults();
-                const referenceSpace = renderer.xr.getReferenceSpace();
-
-                if (results.length > 0) {
-                    const result = results[0];
-                    
-                    // Se l'immagine è attivamente tracciata
-                    if (result.trackingState === 'tracked') {
-                        const pose = frame.getPose(result.imageSpace, referenceSpace);
-                        if (pose) {
-                            virtualPanel.visible = true;
-                            // Agganciamo la matrice del pannello esattamente sopra il QR code
-                            virtualPanel.matrix.fromArray(pose.transform.matrix);
-                            statusText.innerHTML = "✓ PANNELLO EURIX AGGANCIATO";
-                        }
-                    } else if (result.trackingState === 'emulated') {
-                        // Se muovi il telefono veloce, il sistema prova a "indovinare" dove si trova
-                        virtualPanel.visible = true;
-                    }
-                } else {
-                    // Se perdi completamente il QR code di vista
-                    virtualPanel.visible = false;
-                    statusText.innerHTML = "Inquadra il QR Code...";
-                }
-            }
-            if(scene && camera) renderer.render(scene, camera);
-        }
-    </script>
-</body>
+      <a-entity camera></a-entity>
+    </a-scene>
+  </body>
 </html>
