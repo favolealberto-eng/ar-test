@@ -2,61 +2,55 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Prototipo Pannello Fisso</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
-
-    <div id="istruzioni" style="position: absolute; top: 10px; width: 100%; text-align: center; color: white; z-index: 10; font-family: sans-serif; background: rgba(0,0,0,0.5);">
-      Muovi il telefono per trovare il piano.<br>Tocca il cerchio per fissare il pannello.
-    </div>
-
-    <a-scene webxr="optionalFeatures: hit-test, anchors; overlayElement: #istruzioni">
+    <a-scene webxr="optionalFeatures: hit-test, anchors;">
       
       <a-assets>
-        <a-mixin id="stilePannello" 
-                 geometry="primitive: plane; width: 0.6; height: 0.4" 
-                 material="color: #121212; opacity: 0.9"
-                 text="align: center; width: 1.5; color: #00FF00; font: monoid;
-                       value: IMPIANTO HVAC\nTemp: 22.5 C\nPressione: 1.2 bar\nStato: OK">
+        <a-mixin id="pannello" 
+                 geometry="primitive: plane; width: 0.8; height: 0.5" 
+                 material="color: #121212; opacity: 0.9; side: double"
+                 text="align: center; width: 2; color: #00FF00; 
+                       value: MONITORAGGIO EURIX\nTemp: 22.5 C\nStatus: ONLINE">
         </a-mixin>
       </a-assets>
 
-      <a-entity ar-hit-test="target: #puntoPiazzamento">
-        <a-ring color="cyan" rotation="-90 0 0" radius-inner="0.02" radius-outer="0.03"></a-ring>
+      <a-entity ar-hit-test="target: #contenitore">
+        <a-ring color="cyan" rotation="-90 0 0" radius-inner="0.08" radius-outer="0.1"></a-ring>
       </a-entity>
 
-      <a-entity id="puntoPiazzamento"></a-entity>
-
+      <a-entity id="contenitore"></a-entity>
       <a-camera position="0 0 0"></a-camera>
     </a-scene>
 
     <script>
       const scene = document.querySelector('a-scene');
-      const contenitore = document.querySelector('#puntoPiazzamento');
+      const contenitore = document.querySelector('#contenitore');
 
-      // Quando l'utente tocca lo schermo...
-      scene.addEventListener('click', function () {
-        // 1. Troviamo la posizione attuale del mirino
+      // Usiamo l'evento 'select' che è quello ufficiale di WebXR per il tocco/click
+      scene.addEventListener('XRSelect', onSelect); // Per alcuni browser
+      scene.addEventListener('click', onSelect);    // Fallback per altri
+
+      function onSelect() {
         const hitTest = document.querySelector('[ar-hit-test]');
+        // Recuperiamo la posizione del mirino nel momento del tocco
         const position = hitTest.object3D.position;
 
-        // 2. Creiamo il pannello fisico
-        const nuovoPannello = document.createElement('a-entity');
-        nuovoPannello.setAttribute('mixin', 'stilePannello');
-        
-        // 3. Lo posizioniamo esattamente dove c'è il mirino
-        nuovoPannello.setAttribute('position', {x: position.x, y: position.y + 0.3, z: position.z});
-        
-        // Lo orientiamo verso l'alto per facilitare la lettura
-        nuovoPannello.setAttribute('rotation', '-20 0 0');
-
-        // 4. Lo aggiungiamo alla scena (rimarrà fisso grazie allo SLAM)
-        contenitore.appendChild(nuovoPannello);
-        
-        // Nascondiamo il mirino dopo il piazzamento (opzionale)
-        document.getElementById('istruzioni').innerHTML = "Pannello fissato. Puoi muoverti intorno.";
-      });
+        // Creiamo il pannello solo se il mirino è visibile (quindi position != 0)
+        if (position.y !== 0 || position.x !== 0) {
+          const nuovoPannello = document.createElement('a-entity');
+          nuovoPannello.setAttribute('mixin', 'pannello');
+          
+          // Lo alziamo di 20cm rispetto al tavolo per non farlo "affogare" nel legno
+          nuovoPannello.setAttribute('position', {x: position.x, y: position.y + 0.2, z: position.z});
+          
+          // Ruotiamo leggermente verso l'utente
+          nuovoPannello.setAttribute('rotation', '-10 0 0');
+          
+          contenitore.appendChild(nuovoPannello);
+        }
+      }
     </script>
   </body>
 </html>
