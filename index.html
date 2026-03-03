@@ -3,60 +3,36 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EURIX Standalone Test</title>
+    <title>EURIX - Test Girasole</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
     <style>
-        body { margin: 0; font-family: sans-serif; }
-        #custom-button {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            padding: 15px 30px; background: #00ff00; border: 2px solid black;
-            font-weight: bold; cursor: pointer; z-index: 10000;
+        #ar-button {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; border: 1px solid #fff; background: rgba(0,0,0,0.5);
+            color: #fff; cursor: pointer; z-index: 999; font-family: sans-serif;
         }
     </style>
 </head>
 <body>
-    <button id="custom-button">AVVIA AR (HIT-TEST)</button>
-
+    <button id="ar-button">ENTRA IN AR</button>
     <script>
-        let scene, camera, renderer, reticle, session;
+        let scene, camera, renderer, reticle;
         let hitTestSource = null;
         let hitTestSourceRequested = false;
 
-        const btn = document.getElementById('custom-button');
+        const btn = document.getElementById('ar-button');
 
-        // Funzione per avviare la sessione AR manualmente
+        // Avvio Sessione AR
         btn.onclick = async () => {
-            if (navigator.xr) {
-                session = await navigator.xr.requestSession('immersive-ar', {
-                    requiredFeatures: ['hit-test']
-                });
-                onSessionStarted(session);
-            } else {
-                alert("WebXR non supportato su questo browser");
-            }
-        };
-
-        function onSessionStarted(xrSession) {
+            const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'] });
             btn.style.display = 'none';
-            renderer.xr.setSession(xrSession);
-            
-            // Evento al tocco per creare il cilindro (il tuo futuro pannello)
-            const controller = renderer.xr.getController(0);
-            controller.addEventListener('select', () => {
-                if (reticle.visible) {
-                    const geometry = new THREE.CylinderGeometry(0.1, 0.1, 0.2, 32);
-                    const material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-                    const mesh = new THREE.Mesh(geometry, material);
-                    reticle.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
-                    scene.add(mesh);
-                }
-            });
-        }
+            renderer.xr.setSession(session);
+        };
 
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-            
+
             const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
             scene.add(light);
 
@@ -66,14 +42,26 @@
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // Mirino
+            // Il Mirino (Reticle) originale
             reticle = new THREE.Mesh(
                 new THREE.RingGeometry(0.1, 0.11, 32).rotateX(-Math.PI / 2),
-                new THREE.MeshBasicMaterial({ color: 0x00ffff })
+                new THREE.MeshBasicMaterial()
             );
             reticle.matrixAutoUpdate = false;
             reticle.visible = false;
             scene.add(reticle);
+
+            // Al tocco crea l'oggetto (Girasole -> Cilindro)
+            const controller = renderer.xr.getController(0);
+            controller.addEventListener('select', () => {
+                if (reticle.visible) {
+                    const geometry = new THREE.CylinderGeometry(0.1, 0.1, 0.2, 32);
+                    const material = new THREE.MeshPhongMaterial({ color: 0xffffff * Math.random() });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    reticle.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+                    scene.add(mesh);
+                }
+            });
 
             renderer.setAnimationLoop(render);
         }
@@ -82,8 +70,7 @@
             if (frame) {
                 const session = frame.session;
                 const referenceSpace = renderer.xr.getReferenceSpace();
-
-                if (hitTestSourceRequested === false) {
+                if (!hitTestSourceRequested) {
                     session.requestReferenceSpace('viewer').then((refSpace) => {
                         session.requestHitTestSource({ space: refSpace }).then((source) => {
                             hitTestSource = source;
@@ -91,7 +78,6 @@
                     });
                     hitTestSourceRequested = true;
                 }
-
                 if (hitTestSource) {
                     const hitTestResults = frame.getHitTestResults(hitTestSource);
                     if (hitTestResults.length) {
