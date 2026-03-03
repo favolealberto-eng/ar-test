@@ -10,7 +10,11 @@
     
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;">
       
-      <a-marker preset="hiro">
+      <a-marker preset="hiro" 
+          smooth="true" 
+          smoothCount="10" 
+          smoothTolerance="0.01" 
+          smoothThreshold="5">
         
         <a-plane position="0 0.5 0" rotation="-90 0 0" width="1.5" height="1" color="#121212" opacity="0.9">
           <a-text value="IMPIANTO: UTA-01\n\nTemperatura: 22.4 C\nFlusso: Nominale\nStato: ATTIVO" 
@@ -24,3 +28,4 @@
     </a-scene>
   </body>
 </html>
+
