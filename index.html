@@ -1,120 +1,116 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Stabilità EURIX</title>
-    <script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
-    <style>
-        body { margin: 0; }
-        #ar-button {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            padding: 12px 24px; background: #00FF00; color: black;
-            border: none; border-radius: 8px; font-weight: bold; z-index: 999;
-        }
-        #overlay {
-            position: absolute; top: 10px; width: 100%; text-align: center;
-            color: white; font-family: sans-serif; background: rgba(0,0,0,0.4);
-        }
-    </style>
-</head>
-<body>
-    <div id="overlay">Muovi il telefono per trovare il piano.</div>
-    <button id="ar-button">AVVIA MONITORAGGIO</button>
-
+  <head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no'>
+    <title>WebXR Hit Test - EURIX Base</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
+  </head>
+  <body>
+    <header style="position: absolute; width: 100%; text-align: center; color: white; z-index: 10; font-family: sans-serif; top: 20px;">
+      <p>Esempio Hit Test Integrale</p>
+    </header>
     <script type="module">
-        let scene, camera, renderer, reticle;
-        let hitTestSource = null;
-        let hitTestSourceRequested = false;
+      // Importiamo i moduli XR necessari direttamente da server CDN
+      import { ARButton } from 'https://unpkg.com/three@0.126.0/examples/jsm/webxr/ARButton.js';
 
-        const button = document.getElementById('ar-button');
+      let container;
+      let camera, scene, renderer;
+      let reticle;
+      let hitTestSource = null;
+      let hitTestSourceRequested = false;
 
-        async function activateAR() {
-            const session = await navigator.xr.requestSession('immersive-ar', {
-                requiredFeatures: ['hit-test']
-            });
-            
-            renderer.xr.setSession(session);
-            button.style.display = 'none'; // Nasconde il tasto una volta avviato
+      init();
+      animate();
 
-            session.addEventListener('end', () => {
-                button.style.display = 'block';
-            });
+      function init() {
+        container = document.createElement('div');
+        document.body.appendChild(container);
+
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+        scene.add(light);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        // Aggiungiamo il bottone ufficiale WebXR (gestisce lui i permessi)
+        document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+
+        // Creazione del mirino (il cerchio che cerca il piano)
+        reticle = new THREE.Mesh(
+          new THREE.RingGeometry(0.1, 0.11, 32).rotateX(-Math.PI / 2),
+          new THREE.MeshBasicMaterial()
+        );
+        reticle.matrixAutoUpdate = false;
+        reticle.visible = false;
+        scene.add(reticle);
+
+        // Funzione che crea l'oggetto al tocco (il futuro pannello)
+        function onSelect() {
+          if (reticle.visible) {
+            // Per ora creiamo un cilindro (come l'esempio originale)
+            const geometry = new THREE.CylinderGeometry(0.1, 0.1, 0.2, 32);
+            const material = new THREE.MeshPhongMaterial({ color: 0xffffff * Math.random() });
+            const mesh = new THREE.Mesh(geometry, material);
+
+            // Posizioniamo l'oggetto dove si trova il mirino
+            reticle.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+            scene.add(mesh);
+          }
         }
 
-        function init() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+        renderer.xr.getController(0).addEventListener('select', onSelect);
 
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-            scene.add(light);
+        window.addEventListener('resize', onWindowResize);
+      }
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            document.body.appendChild(renderer.domElement);
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
 
-            // CREAZIONE MIRINO (Cerchio Bianco)
-            const ringGeo = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-            reticle = new THREE.Mesh(ringGeo, ringMat);
-            reticle.matrixAutoUpdate = false;
-            reticle.visible = false;
-            scene.add(reticle);
-
-            // EVENTO AL TOCCO (Crea il pannello/rettangolo)
-            const controller = renderer.xr.getController(0);
-            controller.addEventListener('select', () => {
-                if (reticle.visible) {
-                    // Creiamo un rettangolo verde (simula il tuo pannello)
-                    const geometry = new THREE.BoxGeometry(0.3, 0.01, 0.2);
-                    const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-                    const mesh = new THREE.Mesh(geometry, material);
-                    
-                    // Copia la posizione dal mirino
-                    mesh.position.setFromMatrixPosition(reticle.matrix);
-                    mesh.quaternion.setFromRotationMatrix(reticle.matrix);
-                    mesh.position.y += 0.1; // Lo alza un po'
-                    
-                    scene.add(mesh);
-                }
-            });
-
-            button.addEventListener('click', activateAR);
-        }
-
-        function render(timestamp, frame) {
-            if (frame) {
-                const referenceSpace = renderer.xr.getReferenceSpace();
-                const session = renderer.xr.getSession();
-
-                if (hitTestSourceRequested === false) {
-                    session.requestReferenceSpace('viewer').then((refSpace) => {
-                        session.requestHitTestSource({ space: refSpace }).then((source) => {
-                            hitTestSource = source;
-                        });
-                    });
-                    hitTestSourceRequested = true;
-                }
-
-                if (hitTestSource) {
-                    const hitTestResults = frame.getHitTestResults(hitTestSource);
-                    if (hitTestResults.length) {
-                        const hit = hitTestResults[0];
-                        reticle.visible = true;
-                        reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
-                    } else {
-                        reticle.visible = false;
-                    }
-                }
-            }
-            renderer.render(scene, camera);
-        }
-
-        init();
+      function animate() {
         renderer.setAnimationLoop(render);
+      }
 
+      function render(timestamp, frame) {
+        if (frame) {
+          const referenceSpace = renderer.xr.getReferenceSpace();
+          const session = renderer.xr.getSession();
+
+          if (hitTestSourceRequested === false) {
+            session.requestReferenceSpace('viewer').then((referenceSpace) => {
+              session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                hitTestSource = source;
+              });
+            });
+            session.addEventListener('end', () => {
+              hitTestSourceRequested = false;
+              hitTestSource = null;
+            });
+            hitTestSourceRequested = true;
+          }
+
+          if (hitTestSource) {
+            const hitTestResults = frame.getHitTestResults(hitTestSource);
+            if (hitTestResults.length) {
+              const hit = hitTestResults[0];
+              reticle.visible = true;
+              reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
+            } else {
+              reticle.visible = false;
+            }
+          }
+        }
+        renderer.render(scene, camera);
+      }
     </script>
-</body>
+  </body>
 </html>
