@@ -1,134 +1,62 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>EURIX - Test Three.js</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.min.js"></script>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        #ar-button {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            padding: 12px 24px; border: 1px solid #fff; background: rgba(0,0,0,0.5);
-            color: #fff; cursor: pointer; z-index: 999; font-family: sans-serif;
-            border-radius: 4px;
-        }
-    </style>
-</head>
-<body>
-    <button id="ar-button">ENTRA IN AR</button>
-    
+    <title>Prototipo Pannello Fisso</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  </head>
+  <body style="margin: 0; overflow: hidden;">
+
+    <div id="istruzioni" style="position: absolute; top: 10px; width: 100%; text-align: center; color: white; z-index: 10; font-family: sans-serif; background: rgba(0,0,0,0.5);">
+      Muovi il telefono per trovare il piano.<br>Tocca il cerchio per fissare il pannello.
+    </div>
+
+    <a-scene webxr="optionalFeatures: hit-test, anchors; overlayElement: #istruzioni">
+      
+      <a-assets>
+        <a-mixin id="stilePannello" 
+                 geometry="primitive: plane; width: 0.6; height: 0.4" 
+                 material="color: #121212; opacity: 0.9"
+                 text="align: center; width: 1.5; color: #00FF00; font: monoid;
+                       value: IMPIANTO HVAC\nTemp: 22.5 C\nPressione: 1.2 bar\nStato: OK">
+        </a-mixin>
+      </a-assets>
+
+      <a-entity ar-hit-test="target: #puntoPiazzamento">
+        <a-ring color="cyan" rotation="-90 0 0" radius-inner="0.02" radius-outer="0.03"></a-ring>
+      </a-entity>
+
+      <a-entity id="puntoPiazzamento"></a-entity>
+
+      <a-camera position="0 0 0"></a-camera>
+    </a-scene>
+
     <script>
-        let scene, camera, renderer, reticle;
-        let hitTestSource = null;
-        let hitTestSourceRequested = false;
+      const scene = document.querySelector('a-scene');
+      const contenitore = document.querySelector('#puntoPiazzamento');
 
-        const btn = document.getElementById('ar-button');
+      // Quando l'utente tocca lo schermo...
+      scene.addEventListener('click', function () {
+        // 1. Troviamo la posizione attuale del mirino
+        const hitTest = document.querySelector('[ar-hit-test]');
+        const position = hitTest.object3D.position;
 
-        function init() {
-            // 1. Creiamo la scena e la telecamera
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+        // 2. Creiamo il pannello fisico
+        const nuovoPannello = document.createElement('a-entity');
+        nuovoPannello.setAttribute('mixin', 'stilePannello');
+        
+        // 3. Lo posizioniamo esattamente dove c'è il mirino
+        nuovoPannello.setAttribute('position', {x: position.x, y: position.y + 0.3, z: position.z});
+        
+        // Lo orientiamo verso l'alto per facilitare la lettura
+        nuovoPannello.setAttribute('rotation', '-20 0 0');
 
-            // 2. Aggiungiamo una luce per poter vedere i colori degli oggetti
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-            light.position.set(0.5, 1, 0.25);
-            scene.add(light);
-
-            // 3. Impostiamo il motore di rendering (quello che disegna la grafica)
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true; // Abilitiamo la Realtà Aumentata
-            document.body.appendChild(renderer.domElement);
-
-            // 4. Creiamo il mirino (un anello verde)
-            reticle = new THREE.Mesh(
-                new THREE.RingGeometry(0.05, 0.06, 32).rotateX(-Math.PI / 2),
-                new THREE.MeshBasicMaterial({ color: 0x00ff00 }) // Colore verde
-            );
-            reticle.matrixAutoUpdate = false;
-            reticle.visible = false;
-            scene.add(reticle);
-
-            // 5. Configurazione del controller per il tocco (Tap)
-            const controller = renderer.xr.getController(0);
-            controller.addEventListener('select', onSelect);
-            scene.add(controller); // IMPORTANTE: questo mancava nel tuo codice originale!
-
-            // Avviamo il ciclo di animazione
-            renderer.setAnimationLoop(render);
-        }
-
-        // Cosa succede quando tocchiamo lo schermo
-        function onSelect() {
-            if (reticle.visible) {
-                // Creiamo un cubo (che al momento fa da segnaposto per il tuo pannello "Eurix")
-                const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1); // cubo di 10 cm
-                const material = new THREE.MeshPhongMaterial({ color: 0x00aaff }); // Azzurro
-                const mesh = new THREE.Mesh(geometry, material);
-                
-                // Assegniamo al cubo l'esatta posizione e rotazione del mirino
-                mesh.position.setFromMatrixPosition(reticle.matrix);
-                mesh.quaternion.setFromRotationMatrix(reticle.matrix);
-                
-                scene.add(mesh);
-            }
-        }
-
-        // Avvio della sessione AR al click del pulsante
-        btn.onclick = async () => {
-            if (navigator.xr) {
-                const session = await navigator.xr.requestSession('immersive-ar', { 
-                    requiredFeatures: ['hit-test'] 
-                });
-                
-                // Quando usciamo dall'AR, ripristiniamo le variabili
-                session.addEventListener('end', () => {
-                    btn.style.display = 'block';
-                    hitTestSourceRequested = false;
-                    hitTestSource = null;
-                });
-
-                btn.style.display = 'none';
-                renderer.xr.setSession(session);
-            }
-        };
-
-        // Funzione che viene eseguita ad ogni singolo fotogramma (frame)
-        function render(timestamp, frame) {
-            if (frame) {
-                const session = frame.session;
-                const referenceSpace = renderer.xr.getReferenceSpace();
-
-                // Richiediamo il sistema per rilevare i piani (hit test) una sola volta
-                if (!hitTestSourceRequested) {
-                    session.requestReferenceSpace('viewer').then((refSpace) => {
-                        session.requestHitTestSource({ space: refSpace }).then((source) => {
-                            hitTestSource = source;
-                        });
-                    });
-                    hitTestSourceRequested = true;
-                }
-
-                // Se abbiamo il rilevatore, cerchiamo il pavimento
-                if (hitTestSource) {
-                    const hitTestResults = frame.getHitTestResults(hitTestSource);
-                    if (hitTestResults.length > 0) {
-                        const hit = hitTestResults[0];
-                        reticle.visible = true;
-                        // Spostiamo il mirino sul pavimento rilevato
-                        reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
-                    } else {
-                        reticle.visible = false;
-                    }
-                }
-            }
-            renderer.render(scene, camera);
-        }
-
-        // Avviamo l'impostazione iniziale
-        init();
+        // 4. Lo aggiungiamo alla scena (rimarrà fisso grazie allo SLAM)
+        contenitore.appendChild(nuovoPannello);
+        
+        // Nascondiamo il mirino dopo il piazzamento (opzionale)
+        document.getElementById('istruzioni').innerHTML = "Pannello fissato. Puoi muoverti intorno.";
+      });
     </script>
-</body>
+  </body>
 </html>
