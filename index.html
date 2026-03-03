@@ -1,27 +1,48 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prototipo Base EURIX</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <title>Test Stabilità EURIX</title>
+    <script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
+    <style>
+        body { margin: 0; }
+        #ar-button {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; background: #00FF00; color: black;
+            border: none; border-radius: 8px; font-weight: bold; z-index: 999;
+        }
+        #overlay {
+            position: absolute; top: 10px; width: 100%; text-align: center;
+            color: white; font-family: sans-serif; background: rgba(0,0,0,0.4);
+        }
+    </style>
 </head>
-<body style="margin: 0; overflow: hidden;">
-    <div id="overlay" style="position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-family: sans-serif; z-index: 10;">
-        Scannerizza la scrivania...
-    </div>
+<body>
+    <div id="overlay">Muovi il telefono per trovare il piano.</div>
+    <button id="ar-button">AVVIA MONITORAGGIO</button>
+
     <script type="module">
-        let container, renderer, scene, camera, reticle;
+        let scene, camera, renderer, reticle;
         let hitTestSource = null;
         let hitTestSourceRequested = false;
 
-        init();
-        animate();
+        const button = document.getElementById('ar-button');
 
-        async function init() {
-            container = document.createElement('div');
-            document.body.appendChild(container);
+        async function activateAR() {
+            const session = await navigator.xr.requestSession('immersive-ar', {
+                requiredFeatures: ['hit-test']
+            });
+            
+            renderer.xr.setSession(session);
+            button.style.display = 'none'; // Nasconde il tasto una volta avviato
 
+            session.addEventListener('end', () => {
+                button.style.display = 'block';
+            });
+        }
+
+        function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
@@ -32,52 +53,35 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
-            container.appendChild(renderer.domElement);
+            document.body.appendChild(renderer.domElement);
 
-            // TASTO ENTRA IN AR
-            const button = document.createElement('button');
-            button.style.position = 'absolute';
-            button.style.bottom = '20px';
-            button.style.left = '50%';
-            button.style.transform = 'translateX(-50%)';
-            button.textContent = 'AVVIA AR';
-            button.onclick = () => {
-                navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'] }).then(onSessionStarted);
-            };
-            document.body.appendChild(button);
-
-            // MIRINO (Il cerchio bianco)
-            reticle = new THREE.Mesh(
-                new THREE.RingGeometry(0.1, 0.11, 32).rotateX(-Math.PI / 2),
-                new THREE.MeshBasicMaterial()
-            );
+            // CREAZIONE MIRINO (Cerchio Bianco)
+            const ringGeo = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+            reticle = new THREE.Mesh(ringGeo, ringMat);
             reticle.matrixAutoUpdate = false;
             reticle.visible = false;
             scene.add(reticle);
 
-            // EVENTO AL TOCCO (Qui metteremo il pannello)
-            renderer.xr.getController(0).addEventListener('select', onSelect);
-        }
+            // EVENTO AL TOCCO (Crea il pannello/rettangolo)
+            const controller = renderer.xr.getController(0);
+            controller.addEventListener('select', () => {
+                if (reticle.visible) {
+                    // Creiamo un rettangolo verde (simula il tuo pannello)
+                    const geometry = new THREE.BoxGeometry(0.3, 0.01, 0.2);
+                    const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    
+                    // Copia la posizione dal mirino
+                    mesh.position.setFromMatrixPosition(reticle.matrix);
+                    mesh.quaternion.setFromRotationMatrix(reticle.matrix);
+                    mesh.position.y += 0.1; // Lo alza un po'
+                    
+                    scene.add(mesh);
+                }
+            });
 
-        function onSelect() {
-            if (reticle.visible) {
-                // QUI CREIAMO L'OGGETTO (Per ora un cubo, presto il tuo pannello)
-                const geometry = new THREE.BoxGeometry(0.2, 0.01, 0.1);
-                const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-                const mesh = new THREE.Mesh(geometry, material);
-                
-                reticle.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
-                mesh.position.y += 0.05; // Lo alziamo leggermente
-                scene.add(mesh);
-            }
-        }
-
-        function onSessionStarted(session) {
-            renderer.xr.setSession(session);
-        }
-
-        function animate() {
-            renderer.setAnimationLoop(render);
+            button.addEventListener('click', activateAR);
         }
 
         function render(timestamp, frame) {
@@ -86,8 +90,8 @@
                 const session = renderer.xr.getSession();
 
                 if (hitTestSourceRequested === false) {
-                    session.requestReferenceSpace('viewer').then((referenceSpace) => {
-                        session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                    session.requestReferenceSpace('viewer').then((refSpace) => {
+                        session.requestHitTestSource({ space: refSpace }).then((source) => {
                             hitTestSource = source;
                         });
                     });
@@ -107,6 +111,10 @@
             }
             renderer.render(scene, camera);
         }
+
+        init();
+        renderer.setAnimationLoop(render);
+
     </script>
 </body>
 </html>
