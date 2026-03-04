@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>EURIX - AR Dashboard Responsive (Fix Camera)</title>
+    <title>EURIX - Focus Esclusivo Singola Macchina</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
@@ -48,6 +48,8 @@
     </style>
 
     <script>
+      // Il nostro "radar" per tenere traccia di quanti marker stiamo inquadrando
+      let visibleMarkers = new Set();
       let activeMarker = null;
       let currentScale = 1;
 
@@ -64,22 +66,42 @@
         }
       };
 
+      // Funzione ingegneristica centrale: valuta lo stato e decide l'output visivo
+      function checkVisibility() {
+        // Ignora i cambiamenti se l'operatore sta leggendo i dati nella modale "Fissa"
+        if(document.getElementById('hud-modal').style.display === 'flex') return;
+
+        if(visibleMarkers.size === 1) {
+            // VEDE ESATTAMENTE 1 MARKER: Mostra tutto
+            activeMarker = Array.from(visibleMarkers)[0];
+            activeMarker.querySelector('.pannello-3d').setAttribute('visible', 'true');
+            document.getElementById('ui-container').style.display = 'flex';
+        } else {
+            // VEDE 0 OPPURE PIÙ DI 1 MARKER: Nasconde tutto per evitare confusione
+            activeMarker = null;
+            document.getElementById('ui-container').style.display = 'none';
+            document.querySelectorAll('.pannello-3d').forEach(el => {
+                el.setAttribute('visible', 'false');
+            });
+        }
+      }
+
       AFRAME.registerComponent('marker-handler', {
         init: function () {
+          // Nasconde i pannelli di default al caricamento della pagina
+          this.el.querySelector('.pannello-3d').setAttribute('visible', 'false');
+
           this.el.addEventListener('markerFound', () => {
-            activeMarker = this.el;
-            currentScale = 1; 
-            activeMarker.querySelector('.pannello-3d').setAttribute('scale', '1 1 1');
-            document.getElementById('ui-container').style.display = 'flex'; 
+            visibleMarkers.add(this.el);
+            // Resetta lo zoom a 1x per evitare che appaia gigante dalle inquadrature precedenti
+            this.el.querySelector('.pannello-3d').setAttribute('scale', '1 1 1');
+            currentScale = 1;
+            checkVisibility();
           });
 
           this.el.addEventListener('markerLost', () => {
-            if(activeMarker === this.el) {
-                if(document.getElementById('hud-modal').style.display !== 'flex') {
-                  document.getElementById('ui-container').style.display = 'none';
-                }
-                activeMarker = null;
-            }
+            visibleMarkers.delete(this.el);
+            checkVisibility();
           });
         }
       });
@@ -107,7 +129,7 @@
 
       function closeHud() {
         document.getElementById('hud-modal').style.display = 'none';
-        if(activeMarker) document.getElementById('ui-container').style.display = 'flex';
+        checkVisibility(); // Ricalcola cosa mostrare appena chiudi la finestra
       }
     </script>
   </head>
