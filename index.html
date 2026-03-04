@@ -2,50 +2,125 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>EURIX - Test Switch Barcode</title>
+    <title>EURIX - AR Interattiva (Pompa & Caldaia)</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    
+    <style>
+      #ui-container {
+        display: none; position: absolute; bottom: 30px; width: 100%;
+        justify-content: center; gap: 15px; z-index: 999;
+      }
+      .btn {
+        background: #0ea5e9; color: white; border: none; padding: 12px 20px;
+        border-radius: 8px; font-weight: bold; font-family: sans-serif;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3); cursor: pointer;
+      }
+      .btn-freeze { background: #f97316; }
+      
+      #hud-modal {
+        display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.85); z-index: 1000;
+        align-items: center; justify-content: center; font-family: sans-serif;
+      }
+      .hud-card {
+        background: #1e293b; padding: 25px; border-radius: 12px;
+        width: 80%; max-width: 400px; color: white; position: relative;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      }
+      .close-btn {
+        position: absolute; top: 15px; right: 15px; background: transparent;
+        color: #94a3b8; border: none; font-size: 20px; cursor: pointer;
+      }
+      .hud-title { margin-top: 0; border-bottom: 1px solid #475569; padding-bottom: 10px;}
+      .hud-data { line-height: 1.8; color: #f8fafc; white-space: pre-line; font-size: 16px;}
+    </style>
+
+    <script>
+      let activeMarker = null;
+      let currentScale = 1;
+
+      // Database simulato: Dati completi per la modalità Fissa (HUD)
+      const db_simulato = {
+        "0": { 
+            titolo: "POMPA CIRCOLAZIONE P-101", 
+            colore: "#0ea5e9", 
+            dati: "Stato: RUNNING\nFrequenza Inverter: 45 Hz\nPortata: 150 m3/h\nPrevalenza: 3.2 bar\nAssorbimento Elettrico: 5.4 kW\nTemp. Fluido: 45.0 °C\n\nAllarmi: NESSUNO" 
+        },
+        "1": { 
+            titolo: "CALDAIA CONDENSAZIONE C-201", 
+            colore: "#ef4444", 
+            dati: "Stato: BRUCIATORE ATTIVO\nPotenza Termica Erogata: 450 kW\nTemp. Mandata: 80.5 °C\nTemp. Ritorno: 65.2 °C\nRendimento Istantaneo: 98.2%\nPressione Gas: 22 mbar\n\nAllarmi: NESSUNO" 
+        }
+      };
+
+      AFRAME.registerComponent('marker-handler', {
+        init: function () {
+          this.el.addEventListener('markerFound', () => {
+            activeMarker = this.el;
+            currentScale = 1; 
+            activeMarker.querySelector('.pannello-3d').setAttribute('scale', '1 1 1');
+            document.getElementById('ui-container').style.display = 'flex';
+          });
+
+          this.el.addEventListener('markerLost', () => {
+            if(document.getElementById('hud-modal').style.display !== 'flex') {
+              document.getElementById('ui-container').style.display = 'none';
+            }
+            activeMarker = null;
+          });
+        }
+      });
+
+      function zoomPanel(dir) {
+        if(!activeMarker) return;
+        currentScale += dir * 0.2; 
+        if(currentScale < 0.5) currentScale = 0.5; 
+        if(currentScale > 3.0) currentScale = 3.0; 
+        activeMarker.querySelector('.pannello-3d').setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+      }
+
+      function freezePanel() {
+        if(!activeMarker) return;
+        const markerId = activeMarker.getAttribute('value');
+        const dati = db_simulato[markerId];
+
+        document.getElementById('hud-title').innerText = dati.titolo;
+        document.getElementById('hud-title').style.color = dati.colore;
+        document.getElementById('hud-data').innerText = dati.dati;
+
+        document.getElementById('hud-modal').style.display = 'flex';
+        document.getElementById('ui-container').style.display = 'none';
+      }
+
+      function closeHud() {
+        document.getElementById('hud-modal').style.display = 'none';
+        if(activeMarker) document.getElementById('ui-container').style.display = 'flex';
+      }
+    </script>
   </head>
+  
   <body style="margin: 0; overflow: hidden;">
     
-    <a-scene embedded 
-             arjs="sourceType: webcam; 
-                   detectionMode: mono_and_matrix; 
-                   matrixCodeType: 3x3; 
-                   sourceWidth: 1280; 
-                   sourceHeight: 720; 
-                   displayWidth: 1280; 
-                   displayHeight: 720; 
-                   debugUIEnabled: false; 
-                   trackingMethod: best;">
+    <div id="ui-container">
+      <button class="btn" onclick="zoomPanel(0.2)">ZOOM +</button>
+      <button class="btn" onclick="zoomPanel(-0.2)">ZOOM -</button>
+      <button class="btn btn-freeze" onclick="freezePanel()">FISSA A SCHERMO</button>
+    </div>
+
+    <div id="hud-modal">
+      <div class="hud-card">
+        <button class="close-btn" onclick="closeHud()">✖</button>
+        <h2 id="hud-title" class="hud-title">Titolo</h2>
+        <p id="hud-data" class="hud-data">Dati...</p>
+      </div>
+    </div>
+
+    <a-scene embedded arjs="sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3; debugUIEnabled: false;">
       
-      <a-marker type="barcode" value="0" smooth="true" smoothCount="20" smoothTolerance="0.05" smoothThreshold="5">
+      <a-marker type="barcode" value="0" marker-handler smooth="true" smoothCount="10" smoothTolerance="0.05" smoothThreshold="5">
         <a-entity rotation="-90 0 0">
-          <a-plane position="0 0 0.1" width="2.4" height="1.8" material="color: #1e293b; shader: flat;">
-            
-            <a-text value="PANNELLO N.0" position="0 0.7 0.05" align="center" color="#0ea5e9" wrapCount="20" width="2.2"></a-text>
+          <a-plane class="pannello-3d" position="0 0 0.1" width="2.4" height="1.8" material="color: #1e293b; shader: flat;">
+            <a-text value="POMPA CIRCOLAZIONE P-101" position="0 0.7 0.05" align="center" color="#0ea5e9" wrapCount="23" width="2.2"></a-text>
             <a-plane position="0 0.55 0.05" width="2" height="0.01" material="color: #475569; shader: flat;"></a-plane>
-
-            <a-text value="Test aggancio: OK\nMarker riconosciuto: ID 0\n\nIn attesa di connessione dati..." 
-                    position="0 -0.1 0.05" align="center" color="#f8fafc" wrapCount="24" width="2.2" lineHeight="55"></a-text>
-          </a-plane>
-        </a-entity>
-      </a-marker>
-
-      <a-marker type="barcode" value="1" smooth="true" smoothCount="20" smoothTolerance="0.05" smoothThreshold="5">
-        <a-entity rotation="-90 0 0">
-          <a-plane position="0 0 0.1" width="2.4" height="1.8" material="color: #27272a; shader: flat;">
-            
-            <a-text value="PANNELLO N.1" position="0 0.7 0.05" align="center" color="#f97316" wrapCount="20" width="2.2"></a-text>
-            <a-plane position="0 0.55 0.05" width="2" height="0.01" material="color: #475569; shader: flat;"></a-plane>
-            
-            <a-text value="Test aggancio: OK\nMarker riconosciuto: ID 1\n\nNessuna interferenza rilevata." 
-                    position="0 -0.1 0.05" align="center" color="#f8fafc" wrapCount="24" width="2.2" lineHeight="55"></a-text>
-          </a-plane>
-        </a-entity>
-      </a-marker>
-
-      <a-entity camera></a-entity>
-    </a-scene>
-  </body>
-</html>
+            <a
