@@ -2,37 +2,45 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>EURIX - AR Interattiva (Pompa & Caldaia)</title>
+    <title>EURIX - AR Dashboard Bloccata e Zoomabile</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <style>
+      /* UI forzata in primissimo piano su tutti i dispositivi mobili */
       #ui-container {
-        display: none; position: absolute; bottom: 30px; width: 100%;
-        justify-content: center; gap: 15px; z-index: 999;
+        display: none; 
+        position: fixed; /* Fixed invece di absolute per dominare lo schermo */
+        bottom: 30px; 
+        width: 100%;
+        justify-content: center; 
+        gap: 10px; 
+        z-index: 99999; /* Valore estremo per superare il canvas della telecamera */
+        pointer-events: none; /* Permette i click solo sui bottoni, non sullo spazio vuoto */
       }
       .btn {
-        background: #0ea5e9; color: white; border: none; padding: 12px 20px;
+        background: #0ea5e9; color: white; border: none; padding: 12px 18px;
         border-radius: 8px; font-weight: bold; font-family: sans-serif;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3); cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.5); cursor: pointer;
+        pointer-events: auto; /* Riabilita il click sul pulsante */
       }
       .btn-freeze { background: #f97316; }
       
       #hud-modal {
-        display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.85); z-index: 1000;
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.85); z-index: 999999;
         align-items: center; justify-content: center; font-family: sans-serif;
       }
       .hud-card {
         background: #1e293b; padding: 25px; border-radius: 12px;
-        width: 80%; max-width: 400px; color: white; position: relative;
+        width: 85%; max-width: 400px; color: white; position: relative;
         box-shadow: 0 10px 25px rgba(0,0,0,0.5);
       }
       .close-btn {
         position: absolute; top: 15px; right: 15px; background: transparent;
-        color: #94a3b8; border: none; font-size: 20px; cursor: pointer;
+        color: #94a3b8; border: none; font-size: 24px; cursor: pointer;
       }
-      .hud-title { margin-top: 0; border-bottom: 1px solid #475569; padding-bottom: 10px;}
+      .hud-title { margin-top: 0; border-bottom: 1px solid #475569; padding-bottom: 10px; font-size: 20px;}
       .hud-data { line-height: 1.8; color: #f8fafc; white-space: pre-line; font-size: 16px;}
     </style>
 
@@ -40,17 +48,17 @@
       let activeMarker = null;
       let currentScale = 1;
 
-      // Database simulato: Dati completi per la modalità Fissa (HUD)
+      // Database unificato: i dati qui sono identici a quelli stampati nel 3D
       const db_simulato = {
         "0": { 
             titolo: "POMPA CIRCOLAZIONE P-101", 
             colore: "#0ea5e9", 
-            dati: "Stato: RUNNING\nFrequenza Inverter: 45 Hz\nPortata: 150 m3/h\nPrevalenza: 3.2 bar\nAssorbimento Elettrico: 5.4 kW\nTemp. Fluido: 45.0 °C\n\nAllarmi: NESSUNO" 
+            dati: "Stato: RUNNING\nFrequenza Inverter: 45 Hz\nPortata: 150 m3/h\nPrevalenza: 3.2 bar\nAssorb. Elettrico: 5.4 kW\nTemp. Fluido: 45.0 °C\n\nAllarmi: NESSUNO" 
         },
         "1": { 
             titolo: "CALDAIA CONDENSAZIONE C-201", 
             colore: "#ef4444", 
-            dati: "Stato: BRUCIATORE ATTIVO\nPotenza Termica Erogata: 450 kW\nTemp. Mandata: 80.5 °C\nTemp. Ritorno: 65.2 °C\nRendimento Istantaneo: 98.2%\nPressione Gas: 22 mbar\n\nAllarmi: NESSUNO" 
+            dati: "Stato: BRUCIATORE ATTIVO\nPotenza Termica: 450 kW\nTemp. Mandata: 80.5 °C\nTemp. Ritorno: 65.2 °C\nRendimento Istant.: 98.2%\nPressione Gas: 22 mbar\n\nAllarmi: NESSUNO" 
         }
       };
 
@@ -59,15 +67,19 @@
           this.el.addEventListener('markerFound', () => {
             activeMarker = this.el;
             currentScale = 1; 
+            // Resetta la scala del pannello specifico che è stato inquadrato
             activeMarker.querySelector('.pannello-3d').setAttribute('scale', '1 1 1');
             document.getElementById('ui-container').style.display = 'flex';
           });
 
           this.el.addEventListener('markerLost', () => {
-            if(document.getElementById('hud-modal').style.display !== 'flex') {
-              document.getElementById('ui-container').style.display = 'none';
+            // Nascondi i bottoni solo se stiamo perdendo il marker attivo
+            if(activeMarker === this.el) {
+                if(document.getElementById('hud-modal').style.display !== 'flex') {
+                  document.getElementById('ui-container').style.display = 'none';
+                }
+                activeMarker = null;
             }
-            activeMarker = null;
           });
         }
       });
@@ -75,8 +87,8 @@
       function zoomPanel(dir) {
         if(!activeMarker) return;
         currentScale += dir * 0.2; 
-        if(currentScale < 0.5) currentScale = 0.5; 
-        if(currentScale > 3.0) currentScale = 3.0; 
+        if(currentScale < 0.6) currentScale = 0.6; // Evita che diventi invisibile
+        if(currentScale > 3.0) currentScale = 3.0; // Evita che diventi enorme
         activeMarker.querySelector('.pannello-3d').setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
       }
 
@@ -120,7 +132,29 @@
       
       <a-marker type="barcode" value="0" marker-handler smooth="true" smoothCount="10" smoothTolerance="0.05" smoothThreshold="5">
         <a-entity rotation="-90 0 0">
-          <a-plane class="pannello-3d" position="0 0 0.1" width="2.4" height="1.8" material="color: #1e293b; shader: flat;">
-            <a-text value="POMPA CIRCOLAZIONE P-101" position="0 0.7 0.05" align="center" color="#0ea5e9" wrapCount="23" width="2.2"></a-text>
-            <a-plane position="0 0.55 0.05" width="2" height="0.01" material="color: #475569; shader: flat;"></a-plane>
-            <a
+          <a-plane class="pannello-3d" position="0 0 0.1" width="2.4" height="2.2" material="color: #1e293b; shader: flat;">
+            <a-text value="POMPA CIRCOLAZIONE P-101" position="0 0.9 0.05" align="center" color="#0ea5e9" wrapCount="23" width="2.2"></a-text>
+            <a-plane position="0 0.7 0.05" width="2" height="0.01" material="color: #475569; shader: flat;"></a-plane>
+            
+            <a-text value="Stato: RUNNING\nFrequenza Inverter: 45 Hz\nPortata: 150 m3/h\nPrevalenza: 3.2 bar\nAssorb. Elettrico: 5.4 kW\nTemp. Fluido: 45.0 C\n\nAllarmi: NESSUNO" 
+                    position="0 -0.2 0.05" align="center" color="#f8fafc" wrapCount="26" width="2.2" lineHeight="50"></a-text>
+          </a-plane>
+        </a-entity>
+      </a-marker>
+
+      <a-marker type="barcode" value="1" marker-handler smooth="true" smoothCount="10" smoothTolerance="0.05" smoothThreshold="5">
+        <a-entity rotation="-90 0 0">
+          <a-plane class="pannello-3d" position="0 0 0.1" width="2.4" height="2.2" material="color: #27272a; shader: flat;">
+            <a-text value="CALDAIA CONDENSAZIONE C-201" position="0 0.9 0.05" align="center" color="#ef4444" wrapCount="25" width="2.2"></a-text>
+            <a-plane position="0 0.7 0.05" width="2" height="0.01" material="color: #475569; shader: flat;"></a-plane>
+            
+            <a-text value="Stato: BRUCIATORE ATTIVO\nPotenza Termica: 450 kW\nTemp. Mandata: 80.5 C\nTemp. Ritorno: 65.2 C\nRendimento Istant.: 98.2%\nPressione Gas: 22 mbar\n\nAllarmi: NESSUNO" 
+                    position="0 -0.2 0.05" align="center" color="#f8fafc" wrapCount="26" width="2.2" lineHeight="50"></a-text>
+          </a-plane>
+        </a-entity>
+      </a-marker>
+
+      <a-camera position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera>
+    </a-scene>
+  </body>
+</html>
