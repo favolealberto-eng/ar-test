@@ -2,28 +2,46 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>EURIX - AR Dashboard Stabilizzata</title>
+    <title>EURIX - Test Switch Barcode</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
     
-    <a-scene embedded arjs="sourceType: webcam; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; debugUIEnabled: false; trackingMethod: best;">
+    <a-scene embedded 
+             arjs="sourceType: webcam; 
+                   detectionMode: mono_and_matrix; 
+                   matrixCodeType: 3x3; 
+                   sourceWidth: 1280; 
+                   sourceHeight: 720; 
+                   displayWidth: 1280; 
+                   displayHeight: 720; 
+                   debugUIEnabled: false; 
+                   trackingMethod: best;">
       
-      <a-marker preset="hiro" smooth="true" smoothCount="20" smoothTolerance="0.05" smoothThreshold="5">
-        
+      <a-marker type="barcode" value="0" smooth="true" smoothCount="20" smoothTolerance="0.05" smoothThreshold="5">
         <a-entity rotation="-90 0 0">
-          
           <a-plane position="0 0 0.1" width="2.4" height="1.8" material="color: #1e293b; shader: flat;">
             
-            <a-text value="UTA-01 PRINCIPALE" position="0 0.7 0.05" align="center" color="#f97316" wrapCount="20" width="2.2"></a-text>
+            <a-text value="PANNELLO N.0" position="0 0.7 0.05" align="center" color="#0ea5e9" wrapCount="20" width="2.2"></a-text>
             <a-plane position="0 0.55 0.05" width="2" height="0.01" material="color: #475569; shader: flat;"></a-plane>
 
-            <a-text value="T. Mandata: 65.2 C\nT. Ritorno: 54.1 C\n\nPortata: 120 m3/h\nPotenza Termica: 145 kW\n\nStato Pompe: INVERTER 80%" 
+            <a-text value="Test aggancio: OK\nMarker riconosciuto: ID 0\n\nIn attesa di connessione dati..." 
                     position="0 -0.1 0.05" align="center" color="#f8fafc" wrapCount="24" width="2.2" lineHeight="55"></a-text>
-            
           </a-plane>
+        </a-entity>
+      </a-marker>
 
+      <a-marker type="barcode" value="1" smooth="true" smoothCount="20" smoothTolerance="0.05" smoothThreshold="5">
+        <a-entity rotation="-90 0 0">
+          <a-plane position="0 0 0.1" width="2.4" height="1.8" material="color: #27272a; shader: flat;">
+            
+            <a-text value="PANNELLO N.1" position="0 0.7 0.05" align="center" color="#f97316" wrapCount="20" width="2.2"></a-text>
+            <a-plane position="0 0.55 0.05" width="2" height="0.01" material="color: #475569; shader: flat;"></a-plane>
+            
+            <a-text value="Test aggancio: OK\nMarker riconosciuto: ID 1\n\nNessuna interferenza rilevata." 
+                    position="0 -0.1 0.05" align="center" color="#f8fafc" wrapCount="24" width="2.2" lineHeight="55"></a-text>
+          </a-plane>
         </a-entity>
       </a-marker>
 
